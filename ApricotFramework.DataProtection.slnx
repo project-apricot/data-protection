@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApricotFramework.DataProtection/ApricotFramework.DataProtection.csproj" />
+    <Project Path="src/ApricotFramework.DataProtection.AspNetCore/ApricotFramework.DataProtection.AspNetCore.csproj" />
+    <Project Path="src/ApricotFramework.DataProtection.DataOps/ApricotFramework.DataProtection.DataOps.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="tests\.editorconfig" />
+    <Project Path="tests/ApricotFramework.DataProtection.Tests/ApricotFramework.DataProtection.Tests.csproj" />
+    <Project Path="tests/ApricotFramework.DataProtection.AspNetCore.Tests/ApricotFramework.DataProtection.AspNetCore.Tests.csproj" />
+    <Project Path="tests/ApricotFramework.DataProtection.DataOps.Tests/ApricotFramework.DataProtection.DataOps.Tests.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/ApricotFramework.DataProtection.Examples.Relational.Web/ApricotFramework.DataProtection.Examples.Relational.Web.csproj" />
+    <Project Path="examples/ApricotFramework.DataProtection.Examples.DataOps.Web/ApricotFramework.DataProtection.Examples.DataOps.Web.csproj" />
+  </Folder>
+</Solution>

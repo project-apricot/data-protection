@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Persists the ASP.NET Core Data Protection key ring to a data source declared for ApricotFramework.DataOps, taking the connection from its registry and the SQL dialect from the data source's provider. Depends only on the DataOps contracts, so it brings no execution engine and no database driver.</Description>
+    <PackageTags>dataprotection;keyring;dataops;sql;xmlrepository</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ApricotFramework.DataOps.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../ApricotFramework.DataProtection.AspNetCore/ApricotFramework.DataProtection.AspNetCore.csproj" />
+  </ItemGroup>
+
+</Project>

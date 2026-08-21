@@ -1,0 +1,74 @@
+---
+title: Data Protection
+description: What the framework already does, the one gap this fills, and what the three packages contain.
+---
+
+# Data Protection
+
+ASP.NET Core Data Protection already generates keys, rotates them, caches the key ring and hands
+out `IDataProtector`. What it does not do by default is keep that key ring anywhere shared: it
+writes to local disk, so a second instance invents its own keys and a restart can lose them. The
+symptom is familiar — cookies and tokens that stop validating for no visible reason.
+
+The framework's own answer is to swap the storage: file system, Windows registry, Redis, Azure
+Blob Storage, or Entity Framework Core. There is no relational option that does not involve
+Entity Framework. **That gap is the whole of this library**: one table, four statements, plain
+ADO.NET.
+
+Everything else stays the framework's job. This library never chooses your algorithms, your key
+lifetime, or whether keys are encrypted at rest — it only decides where they are written.
+
+## The three packages
+
+| Package | Contains | Depends on |
+| --- | --- | --- |
+| `ApricotFramework.DataProtection` | the store contract, the ADO.NET store, and the four SQL dialects | nothing |
+| `ApricotFramework.DataProtection.AspNetCore` | the repository the key manager talks to, and the registration extensions | the core and the framework |
+| `ApricotFramework.DataProtection.DataOps` | the connection taken from a declared data source | the core, the above, and the DataOps contracts |
+
+No package references a database driver. The host supplies the connection, which is also what keeps
+the core free of dependencies.
+
+## The table
+
+Three fixed columns, named exactly as the official Entity Framework Core provider names them:
+
+| Column | Holds |
+| --- | --- |
+| `Id` | the identity, assigned by the database |
+| `FriendlyName` | the name the key manager gave the element |
+| `Xml` | the serialized element |
+
+Because the names and the stored string match that provider byte for byte, one table can be read by
+either implementation — which makes moving between them a configuration change rather than a
+migration. Only the table and schema names are configurable; see
+[Relational storage](relational) for why the columns are not.
+
+## Configuration shape
+
+```json
+{
+  "DataProtection": {
+    "Application": "/app",
+    "Storage": { "Relational": { "Dialect": "MySql", "TableName": "DataProtectionKeys" } }
+  }
+}
+```
+
+The root holds what belongs to no backend, `Storage` groups the backends with one subsection each,
+and `Protection` will group the key encryption mechanisms the same way. Selection always happens in
+the `PersistKeysTo` or `ProtectKeysWith` call — configuration only supplies settings for what the
+code already chose.
+
+## Not a security boundary
+
+Storing a key ring is not the same as protecting it. Read [Key protection](protection) before
+deploying: choosing explicit storage turns the framework's default at-rest key encryption **off**,
+and a store registered without an encryptor fails at startup for that reason.
+
+The repository carries two runnable examples that differ only in how the connection is obtained:
+one wires a driver directly, the other takes it from a declared data source.
+
+See [Usage](usage) for the store and dialects, [Relational storage](relational) for the schema and
+its DDL, [ASP.NET Core](aspnetcore) for registration, [Key protection](protection) for encryption at
+rest, and [Data operations](dataops) for the data-source adapter.

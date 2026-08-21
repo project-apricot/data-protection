@@ -1,0 +1,51 @@
+---
+title: Key protection
+description: Why choosing storage turns at-rest encryption off, and the two ways to answer for it.
+---
+
+# Key protection
+
+## Choosing storage turns encryption off
+
+> **Warning.** Specifying any explicit key storage location makes the framework **deregister its
+> default at-rest key encryption**. Key material is then written unprotected. This is framework
+> behaviour and applies to every storage provider, this one included.
+
+You will see this at startup, from the framework itself:
+
+```
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {...} may be persisted to storage in unencrypted form.
+```
+
+Because this library is what causes that, it will not let the question go unanswered: registering a
+store without an encryptor **fails at startup**. Configure one:
+
+```csharp
+builder.Services.AddDataProtectionCore(builder.Configuration)
+    .PersistKeysToRelationalStore(_ => new MySqlConnection(connectionString))
+    .ProtectKeysWithCertificate(certificate);
+```
+
+This library configures no encryptor of its own. Choosing one is a deployment decision — a
+certificate, Azure Key Vault, DPAPI — and picking for you would be both wrong and unmovable.
+
+## Saying no, deliberately
+
+Where the keys genuinely need no encryptor — a parameter store holding secure strings, a bucket
+encrypted at rest, or a development machine — say so:
+
+```csharp
+    .AllowUnprotectedKeys();
+```
+
+That configures nothing; it answers the question. The check looks at the outcome rather than at
+configuration, so it also catches a `ProtectKeysWith` call that did not take effect.
+
+> **Note.** `AllowUnprotectedKeys` deliberately does not register a do-nothing encryptor. Any
+> encryptor makes the framework wrap each stored element in an `encryptedSecret` naming the
+> decryptor's assembly-qualified type — which changes the stored shape permanently, and makes those
+> keys unreadable both by a plain framework setup and by anything that later drops the encryptor.
+
+A host that adds no store is unaffected — the framework keeps its own default at-rest encryption
+when nothing replaces the key storage, so there is nothing to answer for.
