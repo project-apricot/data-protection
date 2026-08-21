@@ -1,0 +1,12 @@
+{
+  "title": "Data Protection",
+  "description": "Relational storage for the ASP.NET Core Data Protection key ring, using plain ADO.NET.",
+  "pages": [
+    "index",
+    "usage",
+    "relational",
+    "aspnetcore",
+    "protection",
+    "dataops"
+  ]
+}

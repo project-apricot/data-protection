@@ -1,0 +1,86 @@
+---
+title: Usage
+description: The store contract, the dialects, connection ownership, and using the library without a container.
+---
+
+# Usage
+
+The core package works without a container. `RelationalProtectionKeyStore` needs three things: a way
+to get a connection, a dialect, and the table to use.
+
+```csharp
+var store = new RelationalProtectionKeyStore(
+    () => new OwnedProtectionKeyConnection(new SqliteConnection(connectionString)),
+    new SqliteProtectionKeyDialect(),
+    new ProtectionKeyStoreOptions { Dialect = "Sqlite" });
+```
+
+## The contract
+
+```csharp
+public interface IProtectionKeyStore
+{
+    IReadOnlyList<ProtectionKeyRecord> GetAll();
+    void Add(string friendlyName, string? xml);
+    bool Delete(IReadOnlyList<int> orderedIds);
+}
+```
+
+Synchronous, because the repository the framework asks for is synchronous. An asynchronous contract
+here would buy nothing and force every implementation to block at the one point that matters.
+
+`Delete` takes its identifiers in the order they must be removed and stops at the first failure,
+returning `false`. That ordering is a correctness requirement rather than a preference — the caller
+chooses it so a partial failure cannot leave the key ring unrecoverable.
+
+## Dialects
+
+Four are built in, selected by name, matched case-insensitively:
+
+| Name | Quotes identifiers as |
+| --- | --- |
+| `MySql` | `` `table` `` |
+| `PostgreSql` | `"table"` |
+| `SqlServer` | `[table]` |
+| `Sqlite` | `"table"` |
+
+They are always available and need no registration, so no registration mistake can leave an
+existing key ring unreadable. `Dialect` has no default: guessing an engine produces SQL that
+reaches the server and fails there, while requiring it produces one clear error at startup.
+
+A custom dialect must select all three of `ProtectionKeyColumns` — `Id`, `FriendlyName` and `Xml` —
+but may list them in any order, because the store reads them by name. Omitting one fails naming it
+rather than returning wrong values.
+
+Adding your own follows the same shape as every other Apricot extension point — a dialect sharing a
+name with a built-in replaces it, which is the only way to change a built-in's SQL:
+
+```csharp
+builder.AddProtectionKeySqlDialect<MyDialect>();
+```
+
+> **Note.** SQLite has no schemas, so setting `SchemaName` with the SQLite dialect is an error
+> rather than a silently ignored setting.
+
+## Who owns the connection
+
+The store never disposes a connection. It disposes an `IProtectionKeyConnection`, and what that
+release means is the host's to define:
+
+| Lease | Disposing it |
+| --- | --- |
+| `OwnedProtectionKeyConnection` | disposes the connection it wraps |
+| your own implementation | releases whatever lifetime the connection actually came from |
+
+That indirection exists for exactly one reason: a connection borrowed from a pool or a registry must
+be returned the way its owner expects, not closed underneath it.
+
+## A different store entirely
+
+Implement `IProtectionKeyStore` and register it. Nothing else changes — the repository, the
+discriminator and every framework extension keep working:
+
+```csharp
+builder.Services.AddDataProtectionCore(builder.Configuration)
+    .PersistKeysToStore<MyRedisKeyStore>();
+```

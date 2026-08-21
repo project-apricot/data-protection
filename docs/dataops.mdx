@@ -1,0 +1,59 @@
+---
+title: Data operations
+description: Taking the connection and the engine from a declared data source.
+---
+
+# Data operations
+
+`ApricotFramework.DataProtection.DataOps` is for a host that already declares its databases for
+[ApricotFramework.DataOps](https://projectapricot.dev). It takes the connection from that registry and the dialect from the
+data source's own provider, so neither is configured twice.
+
+```csharp
+builder.Services.AddDataOperations(builder.Configuration);
+builder.Services.AddDataSourceConnection(SqlProvider.MySql, cs => new MySqlConnection(cs));
+
+builder.Services.AddDataProtectionCore(builder.Configuration)
+    .PersistKeysToDataOpsStore();
+```
+
+Settings come from `DataProtection:Storage:Relational`, the same subsection the direct relational
+store uses — this is a relational store that sources its connection differently, not a backend of
+its own. `Dialect` needs no value: a data source declaring `MySql` selects the MySQL dialect.
+Setting it anyway overrides that, for when the connection is not the engine it claims to be.
+
+Name a data source to use something other than the default:
+
+```csharp
+    .PersistKeysToDataOpsStore("Keys");
+```
+
+`AddDataProtectionCore` has already bound the store settings from the `DataProtection`
+section, including a custom section name if you gave one, so this call takes no configuration. A
+host that started data protection some other way passes the section explicitly:
+
+```csharp
+builder.Services.AddDataProtection()
+    .PersistKeysToDataOpsStore(builder.Configuration, "Security:Keys", dataSource: null);
+```
+
+It depends only on `ApricotFramework.DataOps.Abstractions`, so it brings no execution engine, no
+Dapper and no driver. The SQL is the same plain ADO.NET the core package runs — declaring two
+statements as operations would only hide them.
+
+## Connection ownership
+
+A connection comes from the registry as a reference, and disposing that reference is how it is
+released. This package leases it accordingly, so the connection is returned exactly the way the
+registry expects rather than being closed underneath it.
+
+> **Warning.** Register one store, not two. Both `PersistKeysTo` calls add a store with `TryAdd`, so
+> the first wins and the second is ignored — except that a relational store also makes
+> `Dialect` required, for whichever store won. The error names the relational store so the stray
+> call is findable.
+
+## Failures
+
+An unconfigured data source name fails when the store is first resolved, not at the first key read,
+and the message names the data source. A data source declaring an engine no dialect covers fails
+the same way, naming the registered dialects.

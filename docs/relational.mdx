@@ -1,0 +1,107 @@
+---
+title: Relational storage
+description: The table, why its columns are fixed, the DDL for each engine, and who is expected to run it.
+---
+
+# Relational storage
+
+One table, three columns, four statements. The library reads and writes it and never changes its
+shape.
+
+## Who creates the table
+
+**Not this library.** It issues no DDL, ever — matching the official Entity Framework Core
+provider, which expects your own migration, and Quartz.NET, which ships scripts. Three reasons:
+
+- The runtime credential does not need `CREATE TABLE`, and a key store is a poor place to widen
+  privileges.
+- Two instances starting together would race to create it.
+- Creating a table that is missing turns a loud, obvious failure into a silent one.
+
+The normal path is to add the DDL below to whatever already migrates your database. If you would
+rather generate it, every dialect will hand you the same script it builds its queries from, so the
+two cannot drift:
+
+```csharp
+var ddl = new MySqlProtectionKeyDialect()
+    .GetCreateTableScript(new ProtectionKeyStoreOptions { TableName = "DataProtectionKeys" });
+```
+
+## Why the columns are fixed
+
+`Id`, `FriendlyName` and `Xml` are constants, not settings. Configurable column names would
+multiply the statements to test, put configuration inside SQL text, and — most importantly — break
+the match with the official Entity Framework Core provider's entity, which is what lets one table
+serve either implementation.
+
+Table and schema names *are* configurable, because those genuinely differ between deployments. Both
+are checked against a strict allow-list before reaching a statement: up to 63 characters of letters,
+digits and underscore, starting with a letter or underscore. A name that fails is rejected at
+startup rather than concatenated into SQL.
+
+## The DDL
+
+Generated from the dialects themselves. Substitute your own table name if you configured one.
+
+### MySQL
+
+```sql
+CREATE TABLE `DataProtectionKeys` (
+  `Id` INT NOT NULL AUTO_INCREMENT,
+  `FriendlyName` TEXT NULL,
+  `Xml` LONGTEXT NULL,
+  PRIMARY KEY (`Id`)
+);
+```
+
+### PostgreSQL
+
+```sql
+CREATE TABLE "DataProtectionKeys" (
+  "Id" SERIAL PRIMARY KEY,
+  "FriendlyName" TEXT NULL,
+  "Xml" TEXT NULL
+);
+```
+
+### SQL Server
+
+```sql
+CREATE TABLE [DataProtectionKeys] (
+  [Id] INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+  [FriendlyName] NVARCHAR(MAX) NULL,
+  [Xml] NVARCHAR(MAX) NULL
+);
+```
+
+### SQLite
+
+```sql
+CREATE TABLE "DataProtectionKeys" (
+  "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+  "FriendlyName" TEXT NULL,
+  "Xml" TEXT NULL
+);
+```
+
+## The statements
+
+Four, and nothing else. Identifiers are quoted per engine; values are always parameters.
+
+```sql
+SELECT `Id`, `FriendlyName`, `Xml` FROM `DataProtectionKeys`
+INSERT INTO `DataProtectionKeys` (`FriendlyName`, `Xml`) VALUES (@FriendlyName, @Xml)
+DELETE FROM `DataProtectionKeys` WHERE `Id` = @Id
+```
+
+`Id` is never written; the database assigns it. Each statement runs on its own, with no
+transaction, because the key manager never asks for two of them to be atomic.
+
+## A row it cannot read
+
+If a row's `Xml` is present but not well-formed, reading the key ring **throws**, and this is
+deliberate. The key manager stores revocation records in this same table, so a row that were
+quietly skipped could be a revocation — and ignoring it would let a revoked key look live again.
+Every built-in repository in the framework makes the same choice for the same reason.
+
+A row whose `Xml` is null or blank is not an error and is simply skipped.

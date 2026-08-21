@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Relational storage for the ASP.NET Core Data Protection key ring, using plain ADO.NET: the key store contract, a store that reads and writes one table through a connection the host supplies, and SQL dialects for MySQL, PostgreSQL, SQL Server and SQLite. Column names match the official Entity Framework Core provider, so the same table serves either. No database driver and no dependencies.</Description>
+    <PackageTags>dataprotection;keyring;ado.net;sql;xmlrepository</PackageTags>
+  </PropertyGroup>
+
+</Project>

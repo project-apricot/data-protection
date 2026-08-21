@@ -1,0 +1,7 @@
+@host = http://localhost:5240
+
+### Protect and unprotect a payload, which forces the key ring to be created and read.
+GET {{host}}/api/roundtrip
+
+### List the stored key rows.
+GET {{host}}/api/keys

@@ -1,0 +1,135 @@
+---
+title: ASP.NET Core
+description: Registration, configuration binding, startup validation, key deletion and replacing the store.
+---
+
+# ASP.NET Core
+
+`ApricotFramework.DataProtection.AspNetCore` connects the store to the key manager. It takes
+everything from the ASP.NET Core shared framework, so it has zero NuGet dependencies.
+
+```csharp
+using ApricotFramework.DataProtection.AspNetCore.Extensions;
+
+builder.Services.AddDataProtectionCore(builder.Configuration)
+    .PersistKeysToRelationalStore(_ => new MySqlConnection(connectionString));
+```
+
+Two calls rather than one, on purpose. The first starts data protection, applies the discriminator
+and binds the store settings; the second chooses storage and supplies the connection. Keeping them
+apart is what leaves the rest of the builder — key protection, lifetime, algorithms, escrow —
+available and composable in any order.
+
+The connection factory is handed the service provider, so the connection string need not be known
+at registration:
+
+```csharp
+    .PersistKeysToRelationalStore(sp =>
+        new SqliteConnection(sp.GetRequiredService<IConfiguration>().GetConnectionString("Keys")))
+```
+
+> **Warning.** The key ring is read outside any request, so the factory runs on the **root**
+> provider. Resolving a scoped service there throws. Capture what you need from configuration, or
+> resolve a singleton.
+
+`Core` is used in the sense `AddMvcCore` uses it: the foundation you compose onto. It also leaves
+`AddDataProtection(IConfiguration)` free, so a host can put the whole decision in one place and keep
+`Program.cs` to a single line:
+
+```csharp
+// Composition root, somewhere in the app.
+public static IServiceCollection AddDataProtection(this IServiceCollection services, IConfiguration configuration)
+{
+    services.AddDataProtectionCore(configuration)
+        .PersistKeysToDataOpsStore()
+        .ProtectKeysWithCertificate(configuration["Keys:Thumbprint"]!);
+
+    return services;
+}
+```
+
+`AddDataProtectionCore(configuration, "Security:Keys")` moves every setting to a custom root at
+once, since all of them are bound from it. A host that starts data protection some other way names
+the root on the storage call instead: `PersistKeysToRelationalStore(configuration, root, factory)`.
+
+The two need not share a root. The storage call takes its own, so the discriminator can come from
+one section and the store's settings from another:
+
+```csharp
+builder.Services.AddDataProtectionCore(builder.Configuration, "App")
+    .PersistKeysToRelationalStore(builder.Configuration, "Infra", factory);
+```
+
+> **Note.** Both roots bind the same settings object, and binding **merges** rather than replaces —
+> so a key the storage root omits keeps whatever the first root supplied. Keep `Storage` out of the
+> discriminator's root and the two are genuinely independent. Populating it under both is the only
+> way to get a surprise.
+
+> **Warning.** Choosing storage turns the framework's default at-rest key encryption **off**. A
+> store registered without an encryptor fails at startup for that reason. See
+> [Key protection](protection).
+
+## Configuration
+
+```json
+{
+  "DataProtection": {
+    "Application": "/app",
+    "Storage": {
+      "Relational": {
+        "Dialect": "MySql",
+        "TableName": "DataProtectionKeys",
+        "SchemaName": null,
+        "CommandTimeout": "00:00:30"
+      }
+    }
+  }
+}
+```
+
+| Path | Effect |
+| --- | --- |
+| `Application` | the application discriminator; omit for the framework's own default |
+| `Storage:Relational:Dialect` | which engine's SQL to use; required by the relational store, unused by a store that learns the engine from its connection |
+| `Storage:Relational:TableName` | defaults to `DataProtectionKeys` |
+| `Storage:Relational:SchemaName` | omit for the connection's default schema |
+| `Storage:Relational:CommandTimeout` | omit for the driver's default |
+
+The root holds settings that belong to no particular backend; `Storage` groups the backends, one
+subsection each, and a future `Protection` groups the key encryption mechanisms the same way. Which
+backend is used is decided by the `PersistKeysTo` call, never by which subsections exist — a backend
+needs a connection or a credential that configuration cannot carry, so the call has to be there
+regardless.
+
+`Application` is a separate option type from the store settings because it configures the framework
+and means nothing to a store: a Redis store still needs a discriminator while having no table at
+all. Both are bound from the one root, so a custom root name moves all of it together.
+
+> **Warning.** `Application` scopes every payload. Two applications sharing one table must set
+> different values or each can unprotect the other's data, and changing it makes existing payloads
+> unreadable — so it is effectively frozen once anything has been protected.
+
+Both also take an `Action<T>` overload, for a host that configures in code and binds nothing.
+
+## Startup validation
+
+A missing or unknown dialect, an unusable table name or a negative timeout fails at host start
+rather than the first time a cookie is issued. The error names the registered dialects.
+
+## Key deletion
+
+The repository implements `IDeletableXmlRepository`, so `IDeletableKeyManager.DeleteKeys` works —
+the official Entity Framework Core provider implements only `IXmlRepository` and cannot. Deletion
+runs in the order the caller asks for and stops at the first failure.
+
+> **Warning.** Deleting a key whose payloads are still in circulation makes them permanently
+> unreadable. Revoking is almost always what you want instead.
+
+## Replacing the store
+
+`TryAdd` is used throughout, so anything you register first wins:
+
+```csharp
+builder.Services.AddDataProtectionCore(builder.Configuration)
+    .PersistKeysToStore<MyKeyStore>();
+```
