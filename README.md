@@ -64,4 +64,4 @@ startup.** Where that is genuinely intended, say so:
 
 ## Docs
 
-<https://projectapricot.dev>
+<https://projectapricot.dev/docs/data-protection>

@@ -42,7 +42,7 @@ Three fixed columns, named exactly as the official Entity Framework Core provide
 Because the names and the stored string match that provider byte for byte, one table can be read by
 either implementation — which makes moving between them a configuration change rather than a
 migration. Only the table and schema names are configurable; see
-[Relational storage](relational) for why the columns are not.
+[Relational storage](./relational.mdx) for why the columns are not.
 
 ## Configuration shape
 
@@ -62,13 +62,13 @@ code already chose.
 
 ## Not a security boundary
 
-Storing a key ring is not the same as protecting it. Read [Key protection](protection) before
+Storing a key ring is not the same as protecting it. Read [Key protection](./protection.mdx) before
 deploying: choosing explicit storage turns the framework's default at-rest key encryption **off**,
 and a store registered without an encryptor fails at startup for that reason.
 
 The repository carries two runnable examples that differ only in how the connection is obtained:
 one wires a driver directly, the other takes it from a declared data source.
 
-See [Usage](usage) for the store and dialects, [Relational storage](relational) for the schema and
-its DDL, [ASP.NET Core](aspnetcore) for registration, [Key protection](protection) for encryption at
-rest, and [Data operations](dataops) for the data-source adapter.
+See [Usage](./usage.mdx) for the store and dialects, [Relational storage](./relational.mdx) for the schema and
+its DDL, [ASP.NET Core](./aspnetcore.mdx) for registration, [Key protection](./protection.mdx) for encryption at
+rest, and [Data operations](./dataops.mdx) for the data-source adapter.
