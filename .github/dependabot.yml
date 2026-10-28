@@ -11,12 +11,15 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      test-stack:
+      dataops:
         patterns:
-          - "xunit*"
-          - "Microsoft.NET.Test.Sdk"
-          - "coverlet.*"
-          - "Microsoft.Testing.*"
+          - "ApricotFramework.DataOps.*"
+    ignore:
+      - dependency-name: "xunit*"
+      - dependency-name: "Microsoft.NET.Test.Sdk"
+      - dependency-name: "coverlet.*"
+      - dependency-name: "Microsoft.Testing.*"
+      - dependency-name: "Microsoft.Data.Sqlite"
 
   - package-ecosystem: github-actions
     directory: "/"
